@@ -30,7 +30,6 @@ public class Server : Singleton<Server>
 
         DontDestroyOnLoad(gameObject);
         Init();
-        //db.InsertAccount("Foo", "Bar", "mail");
     }
 
     // Update is called once per frame
@@ -102,8 +101,6 @@ public class Server : Singleton<Server>
     #region OnData
     private void OnData(int connectionId, int channelId, int recHostId, NetMsg msg)
     {
-        Debug.Log("Recive a message of type" + msg.OperationCode);
-
         switch (msg.OperationCode) {
             case NetOperationCode.None:
                 Debug.Log("Unexpected NetOperationCode");
@@ -122,26 +119,44 @@ public class Server : Singleton<Server>
 
     private void CreateAccount(int connectionId, int channelId, int recHostId, Net_CreateAccount ca)
     {
-        Debug.Log(string.Format("{0},{1},{2}", ca.Username, ca.Password, ca.Email));
         Net_OnCreateAccount oca = new Net_OnCreateAccount();
+        if (db.InsertAccount(ca.Username, ca.Password, ca.Email)){
+            oca.Success = 1;
+            oca.Informatoion = "Account was Created";
+        }
+        else
+        {
+            oca.Success = 0;
+            oca.Informatoion = "There was an error creating the account!";
 
-        oca.Success = 0;
-        oca.Informatoion = "Account was Created";
+        }
 
         SendClient(recHostId, connectionId, oca);
     }
 
     private void LoginRequest(int connectionId, int channelId, int recHostId, Net_LoginRequest lr)
     {
-        Debug.Log(string.Format("{0},{1}", lr.UsernameOrEmail, lr.Password));
+        string randomToken = Utility.GenerateRandom(4);
 
+        Model_Account account = db.LoginAccount(lr.UsernameOrEmail, lr.Password, connectionId, randomToken);
         Net_OnLoginRequest olr = new Net_OnLoginRequest();
 
-        olr.Success = 0;
-        olr.Informatoion = "Everething is good";
-        olr.Username = "username";
-        olr.Discriminator = "0000";
-        olr.Token = "TOKEN";
+        if (account != null)
+        {
+            olr.Success = 1;
+            olr.Informatoion = "You've been logged in as " + account.Username;
+            olr.Username = account.Username;
+            olr.Discriminator = account.Discriminator;
+            olr.Token = randomToken;
+            olr.ConnectionId = connectionId;
+        }
+        else {
+            olr.Success = 0;
+            olr.Informatoion = "Incorrect login or username";
+        }
+
+
+
 
         SendClient(recHostId, connectionId, olr);
 

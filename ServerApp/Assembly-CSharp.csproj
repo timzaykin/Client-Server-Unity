@@ -63,13 +63,14 @@
     <Compile Include="Assets\Scripts\Database\Model\Model_Account.cs" />
     <Compile Include="Assets\Scripts\Database\Mongo.cs" />
     <Compile Include="Assets\Scripts\Server.cs" />
-    <Compile Include="Assets\Scripts\Shared\Net_CreateAccount.cs" />
-    <Compile Include="Assets\Scripts\Shared\Net_LoginRequest.cs" />
-    <Compile Include="Assets\Scripts\Shared\Net_OnCreateAccount.cs" />
-    <Compile Include="Assets\Scripts\Shared\Net_OnLoginRequest.cs" />
-    <Compile Include="Assets\Scripts\Shared\Net_SendMessage.cs" />
-    <Compile Include="Assets\Scripts\Shared\NetMsg.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_CreateAccount.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_LoginRequest.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_OnCreateAccount.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_OnLoginRequest.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_SendMessage.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\NetMsg.cs" />
     <Compile Include="Assets\Scripts\Shared\Singleton.cs" />
+    <Compile Include="Assets\Scripts\Shared\Utility.cs" />
     <Reference Include="Unity.TextMeshPro.Editor">
       <HintPath>C:/UnityProjects/ClientServerApp/ServerApp/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
     </Reference>

@@ -133,7 +133,7 @@ public class NetworkClient : Singleton<NetworkClient>
         LobbyScene.Instance.ChangeAuthenticationMessage(olr.Informatoion);
 
 
-        if (olr.Success != 0) { 
+        if (olr.Success != 1) { 
             LobbyScene.Instance.EnableInputs();
         }
         else{
@@ -156,19 +156,59 @@ public class NetworkClient : Singleton<NetworkClient>
     }
 
     public void SendCreateAccount(string username, string password, string email) {
+
+
+        if (!Utility.IsUsername(username)) {
+            LobbyScene.Instance.ChangeAuthenticationMessage("Username is invalid");
+            LobbyScene.Instance.EnableInputs();
+            return;
+        }
+
+        if(!Utility.IsEmail(email))
+        {
+            LobbyScene.Instance.ChangeAuthenticationMessage("Email is invalid");
+            LobbyScene.Instance.EnableInputs();
+            return;
+        }
+
+        if (password == null || password =="")
+        {
+            LobbyScene.Instance.ChangeAuthenticationMessage("Password is empty");
+            LobbyScene.Instance.EnableInputs();
+            return;
+        }
+
         Net_CreateAccount ca = new Net_CreateAccount();
         ca.Username = username;
-        ca.Password = password;
+        ca.Password = Utility.Sha256FromSting(password);
         ca.Email = email;
         SendServer(ca);
 
     }
     public void SendLoginRequest(string usernameOrEmail, string password)
     {
+
+
+        if (!Utility.IsUsernameAndDiscriminator(usernameOrEmail) && !Utility.IsEmail(usernameOrEmail))
+        {
+            LobbyScene.Instance.ChangeAuthenticationMessage("Email or Username#Discriminator is invalid");
+            LobbyScene.Instance.EnableInputs();
+            return;
+        }
+
+
+        if (password == null || password == "")
+        {
+            LobbyScene.Instance.ChangeAuthenticationMessage("Password is empty");
+            LobbyScene.Instance.EnableInputs();
+            return;
+        }
+
         Net_LoginRequest lr = new Net_LoginRequest();
         lr.UsernameOrEmail = usernameOrEmail;
-        lr.Password = password;
+        lr.Password = Utility.Sha256FromSting(password);
 
+        LobbyScene.Instance.ChangeAuthenticationMessage("Sending request...");
         SendServer(lr);
     }
     #endregion
