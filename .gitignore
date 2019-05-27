@@ -1,0 +1,6 @@
+ClientApp/Temp/*
+ClientApp/Library/*
+ClientApp/Build/*
+ServerApp/Temp/*
+ServerApp/Library/*
+ServerApp/Build/*
