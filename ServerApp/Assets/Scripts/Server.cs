@@ -84,7 +84,8 @@ public class Server : Singleton<Server>
                 Debug.Log(string.Format("User {0} is connected though {1} !", connectionId, hostId));
                 break;
             case NetworkEventType.DisconnectEvent:
-                Debug.Log(string.Format("User {0} is was disconnected!", connectionId));
+                DisconnectEvent(recHostId, connectionId);
+
                 break;
             case NetworkEventType.DataEvent:
                 BinaryFormatter foramtter = new BinaryFormatter();
@@ -99,6 +100,7 @@ public class Server : Singleton<Server>
         }
     }
     #region OnData
+  
     private void OnData(int connectionId, int channelId, int recHostId, NetMsg msg)
     {
         switch (msg.OperationCode) {
@@ -111,10 +113,80 @@ public class Server : Singleton<Server>
             case NetOperationCode.LoginRequest:
                 LoginRequest(connectionId, channelId, recHostId, (Net_LoginRequest)msg);
                 break;
+            case NetOperationCode.AddFollow:
+                AddFollow(connectionId, channelId, recHostId, (Net_AddFollow)msg);
+                break;
+            case NetOperationCode.RemoveFollow:
+                RemoveFollow(connectionId, channelId, recHostId, (Net_RemoveFollow)msg);
+                break;
+            case NetOperationCode.RequestFollow:
+                RequestFollow(connectionId, channelId, recHostId, (Net_RequestFollow)msg);
+                break;
+
+
+
             case NetOperationCode.SendMessage:
                 SendMessage(connectionId, channelId, recHostId, (Net_SendMessage)msg);
                 break;
         }
+    }
+
+    private void DisconnectEvent(int recHostId,int connectionId) {
+        Debug.Log(string.Format("User {0} is was disconnected!", connectionId));
+        //get a reference to connected account
+        Model_Account account = db.FindAccountByConnectionId(connectionId);
+
+        //just making sure he was indeed authenticated
+        if (account == null) return;
+
+        db.UpdateAccountAfterDisconnection(account.Email);
+
+        //Prepare and send our update message
+
+        Net_FollowUpdate fu = new Net_FollowUpdate();
+        Model_Account updatedAccount = db.FindAccountByEmail(account.Email);
+        fu.Follow = updatedAccount.GetAccount();
+
+        foreach (var f in db.FindeAllFollowBy(account.Email)) {
+
+            if (f.ActiveConnection == 0) continue;
+            SendClient(recHostId, f.ActiveConnection, fu);
+        }
+    }
+
+    private void RequestFollow(int connectionId, int channelId, int recHostId, Net_RequestFollow msg)
+    {
+        Net_OnRequestFollow orf = new Net_OnRequestFollow();
+
+        orf.Follows = db.FindeAllFollowFrom(msg.Token);
+        SendClient(recHostId, connectionId, orf);
+    }
+    private void RemoveFollow(int connectionId, int channelId, int recHostId, Net_RemoveFollow msg)
+    {
+        db.RemoveFollow(msg.Token, msg.UsernameDiscriminator);
+    }
+    private void AddFollow(int connectionId, int channelId, int recHostId, Net_AddFollow msg)
+    {
+        Net_OnAddFollow oaf = new Net_OnAddFollow();
+
+        if (db.InsertFollow(msg.Token, msg.UsernameDiscriminatorOrEmail)) {
+
+            oaf.Success = 1;
+
+            if (Utility.IsEmail(msg.UsernameDiscriminatorOrEmail))
+            {
+                Debug.Log("add follow mail");
+                oaf.Follow = db.FindAccountByEmail(msg.UsernameDiscriminatorOrEmail).GetAccount();
+            }
+            else
+            {
+                string[] data = msg.UsernameDiscriminatorOrEmail.Split('#');
+                if (data[1] == null) return;
+                Debug.Log("add follow descriminator");
+                oaf.Follow = db.FindAccountByUsernameAndDiscriminator(data[0], data[1]).GetAccount();
+            }
+        }
+        SendClient(recHostId, connectionId, oaf);
     }
 
     private void CreateAccount(int connectionId, int channelId, int recHostId, Net_CreateAccount ca)
@@ -133,10 +205,9 @@ public class Server : Singleton<Server>
 
         SendClient(recHostId, connectionId, oca);
     }
-
     private void LoginRequest(int connectionId, int channelId, int recHostId, Net_LoginRequest lr)
     {
-        string randomToken = Utility.GenerateRandom(4);
+        string randomToken = Utility.GenerateRandom(256);
 
         Model_Account account = db.LoginAccount(lr.UsernameOrEmail, lr.Password, connectionId, randomToken);
         Net_OnLoginRequest olr = new Net_OnLoginRequest();
@@ -149,6 +220,20 @@ public class Server : Singleton<Server>
             olr.Discriminator = account.Discriminator;
             olr.Token = randomToken;
             olr.ConnectionId = connectionId;
+
+
+            //Prepare and send our update message
+
+            Net_FollowUpdate fu = new Net_FollowUpdate();
+            fu.Follow = account.GetAccount();
+
+            foreach (var f in db.FindeAllFollowBy(account.Email))
+            {
+
+                if (f.ActiveConnection == 0) continue;
+                SendClient(recHostId, f.ActiveConnection, fu);
+            }
+
         }
         else {
             olr.Success = 0;
@@ -161,7 +246,6 @@ public class Server : Singleton<Server>
         SendClient(recHostId, connectionId, olr);
 
     }
-
     private void SendMessage(int connectionId, int channelId, int recHostId, Net_SendMessage msg)
     {
         Debug.Log(string.Format("{0}", msg.Message));
@@ -179,6 +263,7 @@ public class Server : Singleton<Server>
         if (recHost == 0) { NetworkTransport.Send(hostId, connectionId, myReliableChannelId, buffer, BYTE_SIZE, out error); }
         else{ NetworkTransport.Send(webHostId, connectionId, myReliableChannelId, buffer, BYTE_SIZE, out error);}
 
+        Debug.Log("Send to client " + msg.GetType().ToString());
     }
     #endregion
 

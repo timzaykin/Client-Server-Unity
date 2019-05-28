@@ -1,4 +1,5 @@
 ﻿#pragma warning disable CS0618 // Тип или член устарел
+using System;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
@@ -19,7 +20,9 @@ public class NetworkClient : Singleton<NetworkClient>
     private int webHostId;
     private byte error;
 
+    public Account self;
 
+    private string token;
     private bool isStarted;
 
     // Start is called before the first frame update
@@ -90,7 +93,7 @@ public class NetworkClient : Singleton<NetworkClient>
                 Debug.Log("Disconnected from server");
                 break;
             case NetworkEventType.DataEvent:
-                Debug.Log("Data");
+                Debug.Log("OnData");
                 BinaryFormatter foramtter = new BinaryFormatter();
                 MemoryStream ms = new MemoryStream(recBuffer);
                 NetMsg msg = (NetMsg)foramtter.Deserialize(ms);
@@ -102,10 +105,9 @@ public class NetworkClient : Singleton<NetworkClient>
                 break;
         }
     }
+
     #region onData
-
     private void OnData(int connectionId , int channelId, int recHostId, NetMsg msg) {
-
         switch (msg.OperationCode)
         {
             case NetOperationCode.None:
@@ -119,15 +121,27 @@ public class NetworkClient : Singleton<NetworkClient>
             case NetOperationCode.OnLoginRequest:
                 OnLoginRequest((Net_OnLoginRequest)msg);
                 break;
+
+            case NetOperationCode.OnAddFollow:
+                OnAddFollow((Net_OnAddFollow)msg);
+                break;
+
+            case NetOperationCode.OnRequestFollow:
+                OnRequestFollow((Net_OnRequestFollow)msg);
+                break;
+            case NetOperationCode.FollowUpdate:
+                Net_FollowUpdate((Net_FollowUpdate)msg);
+                break;
         }
 
     }
+
+ 
 
     private void OnCreateAccount(Net_OnCreateAccount oca) {
         LobbyScene.Instance.EnableInputs();
         LobbyScene.Instance.ChangeAuthenticationMessage(oca.Informatoion);
     }
-
     private void OnLoginRequest(Net_OnLoginRequest olr)
     {
         LobbyScene.Instance.ChangeAuthenticationMessage(olr.Informatoion);
@@ -135,13 +149,35 @@ public class NetworkClient : Singleton<NetworkClient>
 
         if (olr.Success != 1) { 
             LobbyScene.Instance.EnableInputs();
+
         }
         else{
             //seccessfull Login
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Hub");
+            self = new Account();
+            self.ActiveConnection = olr.ConnectionId;
+            self.Username = olr.Username;
+            self.Discriminator = olr.Discriminator;
+            token = olr.Token;
+
         }
     }
+    private void OnAddFollow(Net_OnAddFollow oaf) {
 
-    
+        if(oaf.Success == 1) HubScene.Instance.AddFollowTOUi(oaf.Follow);
+
+    }
+    private void OnRequestFollow(Net_OnRequestFollow orf)
+    {
+        foreach (var follow in orf.Follows)
+        {
+            HubScene.Instance.AddFollowTOUi(follow);
+        }
+    }
+    private void Net_FollowUpdate(Net_FollowUpdate fu)
+    {
+        HubScene.Instance.UpdateFollow(fu.Follow);
+    }
     #endregion
 
     #region Send
@@ -154,7 +190,6 @@ public class NetworkClient : Singleton<NetworkClient>
 
         NetworkTransport.Send(hostId, connectionId, myReliableChannelId, buffer, BYTE_SIZE, out error); 
     }
-
     public void SendCreateAccount(string username, string password, string email) {
 
 
@@ -211,6 +246,32 @@ public class NetworkClient : Singleton<NetworkClient>
         LobbyScene.Instance.ChangeAuthenticationMessage("Sending request...");
         SendServer(lr);
     }
+
+    public void SendAddFollow(string usernameOrEmail) {
+        Net_AddFollow af = new Net_AddFollow();
+
+        af.Token = token;
+        af.UsernameDiscriminatorOrEmail = usernameOrEmail;
+
+        SendServer(af);
+    }
+    public void SendRemoveFollow(string username)
+    {
+        Net_RemoveFollow rf = new Net_RemoveFollow();
+
+        rf.Token = token;
+        rf.UsernameDiscriminator = username;
+
+        SendServer(rf);
+    }
+    public void SendRequestFollow() {
+        Net_RequestFollow rf = new Net_RequestFollow();
+
+        rf.Token = token;
+        SendServer(rf);
+    }
+
+
     #endregion
 }
 #pragma warning restore CS0618 // Тип или член устарел

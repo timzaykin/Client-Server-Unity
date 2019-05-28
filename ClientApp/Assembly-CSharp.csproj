@@ -60,12 +60,20 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Scripts\LobbyScene.cs" />
     <Compile Include="Assets\Scripts\NetworkClient.cs" />
+    <Compile Include="Assets\Scripts\Scenes\HubScene.cs" />
+    <Compile Include="Assets\Scripts\Scenes\LobbyScene.cs" />
+    <Compile Include="Assets\Scripts\Shared\Account.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_AddFollow.cs" />
     <Compile Include="Assets\Scripts\Shared\NetMessage\Net_CreateAccount.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_FollowUpdate.cs" />
     <Compile Include="Assets\Scripts\Shared\NetMessage\Net_LoginRequest.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_OnAddFollow.cs" />
     <Compile Include="Assets\Scripts\Shared\NetMessage\Net_OnCreateAccount.cs" />
     <Compile Include="Assets\Scripts\Shared\NetMessage\Net_OnLoginRequest.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_OnRequestFollow.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_RemoveFollow.cs" />
+    <Compile Include="Assets\Scripts\Shared\NetMessage\Net_RequestFollow.cs" />
     <Compile Include="Assets\Scripts\Shared\NetMessage\Net_SendMessage.cs" />
     <Compile Include="Assets\Scripts\Shared\NetMessage\NetMsg.cs" />
     <Compile Include="Assets\Scripts\Shared\Singleton.cs" />

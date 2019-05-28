@@ -3,9 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-public class LobbyScene : Singleton<LobbyScene>
+public class LobbyScene : MonoBehaviour
 {
+    public static LobbyScene Instance { get; set; }
 
+    public void Start()
+    {
+        Instance = this;
+    }
     public void OnClicCreateAccount() {
 
         DisableInputs();
@@ -16,7 +21,6 @@ public class LobbyScene : Singleton<LobbyScene>
 
         NetworkClient.Instance.SendCreateAccount(username, password, email);
     }
-
     public void OnClickLoginRequest() {
 
         DisableInputs();
@@ -26,21 +30,17 @@ public class LobbyScene : Singleton<LobbyScene>
 
         NetworkClient.Instance.SendLoginRequest(usernameOrEmail, password);
     }
-
     public void ChangeWelcomeMessage(string msg) {
         GameObject.Find("WelcomeMessageText").GetComponent<TextMeshProUGUI>().text = msg;
     }
-
     public void ChangeAuthenticationMessage(string msg)
     {
         Debug.Log(msg);
         GameObject.Find("AuthenticationMessageText").GetComponent<TextMeshProUGUI>().text = msg;
     }
-
     public void EnableInputs() {
         GameObject.Find("Canvas").GetComponent<CanvasGroup>().interactable = true;
     }
-
     public void DisableInputs()
     {
         GameObject.Find("Canvas").GetComponent<CanvasGroup>().interactable = false;
