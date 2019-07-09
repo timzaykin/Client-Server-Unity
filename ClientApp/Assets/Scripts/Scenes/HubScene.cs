@@ -14,6 +14,7 @@ public class HubScene : MonoBehaviour
     [SerializeField] private GameObject followPrefab;
     [SerializeField] private Transform followContainer;
 
+
     private Dictionary<string, GameObject> uiFollows = new Dictionary<string, GameObject>();
 
     // Start is called before the first frame update

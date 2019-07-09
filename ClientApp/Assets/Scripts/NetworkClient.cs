@@ -1,5 +1,6 @@
 ﻿#pragma warning disable CS0618 // Тип или член устарел
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
@@ -20,14 +21,21 @@ public class NetworkClient : Singleton<NetworkClient>
     private int webHostId;
     private byte error;
 
+    private int ClientID;
+
     public Account self;
 
     private string token;
     private bool isStarted;
 
+    public int CurrrentClientViewsCount = 0;
+
+    private Dictionary<int, NetView> activeViews;
     // Start is called before the first frame update
+
     void Start()
     {
+        activeViews = new Dictionary<int, NetView>();
         DontDestroyOnLoad(gameObject);
         Init();
     }
@@ -87,7 +95,7 @@ public class NetworkClient : Singleton<NetworkClient>
             case NetworkEventType.Nothing:
                 break;
             case NetworkEventType.ConnectEvent:
-                Debug.Log("Connected to the server");
+                Debug.Log(string.Format("Connected to the server. Host:{0}, ConnID:{1}, Channel:{2}", recHostId,connectionId,channelId));
                 break;
             case NetworkEventType.DisconnectEvent:
                 Debug.Log("Disconnected from server");
@@ -114,6 +122,10 @@ public class NetworkClient : Singleton<NetworkClient>
                 Debug.Log("Unexpected <NetOperationCode>");
                 break;
 
+            case NetOperationCode.OnConnect:
+                OnConnect((Net_OnConnect)msg);
+                break;
+
             case NetOperationCode.OnCreateAccount:
                 OnCreateAccount((Net_OnCreateAccount)msg);
                 break;
@@ -132,11 +144,29 @@ public class NetworkClient : Singleton<NetworkClient>
             case NetOperationCode.FollowUpdate:
                 Net_FollowUpdate((Net_FollowUpdate)msg);
                 break;
+            case NetOperationCode.SendMessage:
+                OnSendMessage((Net_SendMessage)msg);
+                break;
+
+            case NetOperationCode.SendPosition:
+                OnSendPosition((Net_SendPosition)msg);
+                break;
+            case NetOperationCode.Instantiate:
+                OnInstantiate((Net_Instantiate)msg);
+                break;
+            case NetOperationCode.CallRPC:
+                OnRPC((Net_CallRPC)msg);
+                break;
         }
 
     }
 
- 
+
+    private void OnConnect(Net_OnConnect msg)
+    {
+        Debug.Log("My ID is :" + msg.ConnID);
+        ClientID = msg.ConnID;
+    }
 
     private void OnCreateAccount(Net_OnCreateAccount oca) {
         LobbyScene.Instance.EnableInputs();
@@ -177,6 +207,35 @@ public class NetworkClient : Singleton<NetworkClient>
     private void Net_FollowUpdate(Net_FollowUpdate fu)
     {
         HubScene.Instance.UpdateFollow(fu.Follow);
+    }
+
+    private void OnSendMessage(Net_SendMessage msg)
+    {
+        Debug.Log(string.Format("messgae: {0}", msg.Message));
+    }
+
+    private void OnSendPosition(Net_SendPosition msg)
+    {
+        Debug.Log(string.Format("OvnerID:{0},myReliableChannelId:{4},ConnetctionID:{5}, Vector3({1},{2},{3})", msg.OvnerId, msg.X, msg.Y, msg.Z, myReliableChannelId,connectionId));
+        activeViews[msg.ViewId].SetMessageToView(msg);
+    }
+
+    private void OnInstantiate(Net_Instantiate msg)
+    {
+       GameObject Instance = Instantiate(Resources.Load(msg.PrefabPath) as GameObject);
+        NetView[] views = Instance.GetComponentsInChildren<NetView>();
+        for (int i = 0; i < views.Length; i++)
+        {
+            views[i].ViewId = msg.ViewId[i];
+            views[i].OwnerId = msg.OvnerId;
+            views[i].ReristerViewId();
+        }
+        Instance.transform.position = new Vector3(msg.X, msg.Y, msg.Z);
+    }
+    private void OnRPC(Net_CallRPC msg)
+    {
+
+        activeViews[msg.ViewId].PrepareToReciveRPC(msg);
     }
     #endregion
 
@@ -220,6 +279,7 @@ public class NetworkClient : Singleton<NetworkClient>
         SendServer(ca);
 
     }
+
     public void SendLoginRequest(string usernameOrEmail, string password)
     {
 
@@ -271,7 +331,109 @@ public class NetworkClient : Singleton<NetworkClient>
         SendServer(rf);
     }
 
+    public void SendNetInstantiate(string prefabPath, Vector3 position) {
+        Net_Instantiate instMsg = new Net_Instantiate();
+        GameObject Instance = Instantiate(Resources.Load(prefabPath) as GameObject, position, Quaternion.identity);
+        Instance.GetComponent<NetView>().OwnerId = ClientID;
+        instMsg.PrefabPath = prefabPath;
+        instMsg.OvnerId = ClientID;
+        instMsg.ViewId = Instance.GetComponent<NetView>().GetChildViewId();
+        instMsg.X = position.x;
+        instMsg.Y = position.y;
+        instMsg.Z = position.z;
+        SendServer(instMsg);
+    }
 
+    public void CallRPC(int viewId, string methodName) {
+        Net_CallRPC rpc = new Net_CallRPC();
+        rpc.MethodName = methodName;
+        rpc.OvnerId = ClientID;
+        rpc.ViewId = viewId;
+        rpc.parametres = null;
+        SendServer(rpc);
+    }
+
+    public void CallRPC(int viewId, string methodName, int[] param)
+    {
+        Net_CallRPC rpc = new Net_CallRPC();
+        rpc.MethodName = methodName;
+        rpc.OvnerId = ClientID;
+        rpc.ViewId = viewId;
+        Net_ToInt toInt = new Net_ToInt();
+        toInt.param = param;
+        rpc.parametres = ParamsSerializer.SerializeParametr(toInt);
+        SendServer(rpc);
+    }
+
+    public void CallRPC(int viewId, string methodName, float[] param)
+    {
+        Net_CallRPC rpc = new Net_CallRPC();
+        rpc.MethodName = methodName;
+        rpc.OvnerId = ClientID;
+        rpc.ViewId = viewId;
+        Net_ToFloat toFloat = new Net_ToFloat();
+        toFloat.param = param;
+        rpc.parametres = ParamsSerializer.SerializeParametr(toFloat);
+        SendServer(rpc);
+    }
+
+    public void CallRPC(int viewId, string methodName, string[] param)
+    {
+        Net_CallRPC rpc = new Net_CallRPC();
+        rpc.MethodName = methodName;
+        rpc.OvnerId = ClientID;
+        rpc.ViewId = viewId;
+        Net_ToString toString = new Net_ToString();
+        toString.param = param;
+        rpc.parametres = ParamsSerializer.SerializeParametr(toString);
+        SendServer(rpc);
+    }
+
+    public void CallRPC(int viewId, string methodName, Vector2 param)
+    {
+        Net_CallRPC rpc = new Net_CallRPC();
+        rpc.MethodName = methodName;
+        rpc.OvnerId = ClientID;
+        rpc.ViewId = viewId;
+        Net_ToVector2 toVector2 = new Net_ToVector2();
+        toVector2.x = param.x;
+        toVector2.y = param.y;
+        rpc.parametres = ParamsSerializer.SerializeParametr(toVector2);
+        SendServer(rpc);
+    }
+
+    public void CallRPC(int viewId, string methodName, Vector3 param)
+    {
+        Net_CallRPC rpc = new Net_CallRPC();
+        rpc.MethodName = methodName;
+        rpc.OvnerId = ClientID;
+        rpc.ViewId = viewId;
+        Net_ToVector3 toVector3 = new Net_ToVector3();
+        toVector3.x = param.x;
+        toVector3.y = param.y;
+        toVector3.z = param.z;
+        rpc.parametres = ParamsSerializer.SerializeParametr(toVector3);
+        SendServer(rpc);
+    }
+
+
+    #endregion
+
+    #region Getters
+    public int GetClientId() {
+        return ClientID;
+    }
+    #endregion
+
+    #region WorkWithViews
+    public void RegisterView(int id, NetView view) {
+        activeViews.Add(id, view);
+    }
+
+    public void UnregisterView(int id)
+    {
+        activeViews.Remove(id);
+    }
     #endregion
 }
 #pragma warning restore CS0618 // Тип или член устарел

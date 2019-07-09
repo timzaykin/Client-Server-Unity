@@ -1,5 +1,6 @@
 ﻿#pragma warning disable CS0618 // Тип или член устарел
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
@@ -18,6 +19,7 @@ public class Server : Singleton<Server>
     private int webHostId;
     private byte error;
 
+    private List<int> AllOpenConnections;
     private bool isStarted;
 
     private Mongo db;
@@ -27,7 +29,7 @@ public class Server : Singleton<Server>
     {
         db = new Mongo();
         db.Init();
-
+        AllOpenConnections = new List<int>();
         DontDestroyOnLoad(gameObject);
         Init();
     }
@@ -82,10 +84,14 @@ public class Server : Singleton<Server>
                 break;
             case NetworkEventType.ConnectEvent:
                 Debug.Log(string.Format("User {0} is connected though {1} !", connectionId, hostId));
+                AllOpenConnections.Add(connectionId);
+                Net_OnConnect oc = new Net_OnConnect();
+                oc.ConnID = connectionId;
+                SendClient(recHostId, connectionId, oc);
                 break;
             case NetworkEventType.DisconnectEvent:
                 DisconnectEvent(recHostId, connectionId);
-
+                AllOpenConnections.Remove(connectionId);
                 break;
             case NetworkEventType.DataEvent:
                 BinaryFormatter foramtter = new BinaryFormatter();
@@ -123,13 +129,24 @@ public class Server : Singleton<Server>
                 RequestFollow(connectionId, channelId, recHostId, (Net_RequestFollow)msg);
                 break;
 
-
-
             case NetOperationCode.SendMessage:
                 SendMessage(connectionId, channelId, recHostId, (Net_SendMessage)msg);
                 break;
+
+            case NetOperationCode.SendPosition:
+                SendTransform(connectionId, channelId, recHostId, (Net_SendPosition)msg);
+                break;
+            case NetOperationCode.Instantiate:
+                SendInstantiate(connectionId, channelId, recHostId, (Net_Instantiate)msg);
+                break;
+            case NetOperationCode.CallRPC:
+                SendRPC(connectionId, channelId, recHostId, (Net_CallRPC)msg);
+                break;
+
         }
     }
+
+
 
     private void DisconnectEvent(int recHostId,int connectionId) {
         Debug.Log(string.Format("User {0} is was disconnected!", connectionId));
@@ -205,6 +222,7 @@ public class Server : Singleton<Server>
 
         SendClient(recHostId, connectionId, oca);
     }
+
     private void LoginRequest(int connectionId, int channelId, int recHostId, Net_LoginRequest lr)
     {
         string randomToken = Utility.GenerateRandom(256);
@@ -246,10 +264,39 @@ public class Server : Singleton<Server>
         SendClient(recHostId, connectionId, olr);
 
     }
+
+    //тут код сгенерированный мной
     private void SendMessage(int connectionId, int channelId, int recHostId, Net_SendMessage msg)
     {
         Debug.Log(string.Format("{0}", msg.Message));
     }
+
+    private void SendTransform(int connectionId, int channelId, int recHostId, Net_SendPosition msg) {
+
+        foreach (var connection in AllOpenConnections)
+        {
+            Debug.Log("Instance: target - " + connection + ", owner - " + connectionId);
+            if (connection != connectionId) SendClient(recHostId, connection, msg);
+        }        
+    }
+
+    private void SendInstantiate(int connectionId, int channelId, int recHostId, Net_Instantiate msg) {
+        foreach (var connection in AllOpenConnections)
+        {
+            Debug.Log("Instance: target - " + connection + ", owner - " + connectionId);
+            if(connection != connectionId) SendClient(recHostId, connection, msg);
+        }
+    }
+
+    private void SendRPC(int connectionId, int channelId, int recHostId, Net_CallRPC msg)
+    {
+        foreach (var connection in AllOpenConnections)
+        {
+            Debug.Log("Instance: target - " + connection + ", owner - " + connectionId);
+            SendClient(recHostId, connection, msg);
+        }
+    }
+
     #endregion
 
     #region Send
